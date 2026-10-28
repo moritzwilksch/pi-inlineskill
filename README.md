@@ -14,6 +14,12 @@ Skill files are read by the extension before submission. The agent receives the 
 
 ## Install
 
+From npm:
+
+```sh
+pi install npm:@moritzwilksch/pi-inlineskill
+```
+
 From this directory:
 
 ```sh

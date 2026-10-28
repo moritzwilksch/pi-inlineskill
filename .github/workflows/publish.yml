@@ -1,0 +1,69 @@
+name: Publish
+on:
+  push:
+    tags:
+      - v*
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify release tag matches package version
+        run: |
+          expected="v$(jq -r '.version' package.json)"
+          if [[ "$GITHUB_REF_NAME" != "$expected" ]]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match package version $expected"
+            exit 1
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: "*.tgz"
+
+  # Publishes through trusted publishing (OIDC). A version already on npm is skipped, so a rerun
+  # finishes what an earlier one left.
+  npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npmjs
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          # The job installs nothing, so there is nothing to cache, and nothing a cache could poison.
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: npm-package
+      - name: Publish package
+        run: |
+          tarball=$(ls npm-package/*.tgz)
+          manifest=$(tar -xOzf "$tarball" package/package.json)
+          name=$(jq -r .name <<< "$manifest")
+          version=$(jq -r .version <<< "$manifest")
+          if npm view "$name@$version" version > /dev/null 2>&1; then
+            echo "$name@$version is already published."
+            exit 0
+          fi
+          npm publish "./$tarball" --access public --provenance

@@ -4,7 +4,8 @@ import type { AutocompleteProvider } from "@earendil-works/pi-tui";
 import { CustomEditor, stripFrontmatter, type ExtensionAPI, type SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 
 // Consume code literals before looking for standalone skill references.
-const references = /^ {0,3}(?<fence>`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\k<fence>(?:`*|~*)[ \t]*(?=\r?$)|(?![\s\S]))|(?<ticks>`+)[\s\S]*?\k<ticks>(?!`)|(?<![\w./\\:])\/(?:skill:)?(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w/:-]|\.[\w])/gm;
+const references =
+  /^ {0,3}(?<fence>`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\k<fence>(?:`*|~*)[ \t]*(?=\r?$)|(?![\s\S]))|(?<ticks>`+)[\s\S]*?\k<ticks>(?!`)|(?<![\w./\\:])\/(?:skill:)?(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w/:-]|\.[\w])/gm;
 
 function skillReferences(text: string, commands: SlashCommandInfo[]) {
   const skills = new Map(commands.filter(command => command.source === "skill").map(command => [command.name.slice(6), command]));
@@ -34,13 +35,19 @@ function skillAutocomplete(current: AutocompleteProvider, pi: ExtensionAPI): Aut
       // Pi routes inline Tab through force:true, not its slash-command trigger.
       if (!prefix) return current.getSuggestions(lines, cursorLine, cursorCol, options);
       const start = lines.slice(0, cursorLine).join("\n").length + (cursorLine > 0 ? 1 : 0) + cursorCol - prefix.length;
-      const inCode = [...lines.join("\n").matchAll(references)].some(match => !match.groups?.name && match.index <= start && match.index + match[0].length > start);
+      const inCode = [...lines.join("\n").matchAll(references)].some(
+        match => !match.groups?.name && match.index <= start && match.index + match[0].length > start,
+      );
       if (inCode) return current.getSuggestions(lines, cursorLine, cursorCol, options);
       const qualified = prefix.startsWith("/skill:");
-      const items = pi.getCommands().filter(command => command.source === "skill").map(command => {
-        const value = `/${qualified ? command.name : command.name.slice(6)}`;
-        return { value, label: value, description: command.description, inlineSkill: true };
-      }).filter(item => item.value.startsWith(prefix));
+      const items = pi
+        .getCommands()
+        .filter(command => command.source === "skill")
+        .map(command => {
+          const value = `/${qualified ? command.name : command.name.slice(6)}`;
+          return { value, label: value, description: command.description, inlineSkill: true };
+        })
+        .filter(item => item.value.startsWith(prefix));
       if (items.length === 0) return current.getSuggestions(lines, cursorLine, cursorCol, options);
       const native = before.trimStart() === prefix ? await current.getSuggestions(lines, cursorLine, cursorCol, { ...options, force: false }) : null;
       return { prefix, items: [...(native?.prefix === prefix ? native.items.filter(item => !item.value.startsWith("skill:")) : []), ...items] };
@@ -51,7 +58,8 @@ function skillAutocomplete(current: AutocompleteProvider, pi: ExtensionAPI): Aut
       }
       return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
     },
-    shouldTriggerFileCompletion: (lines, cursorLine, cursorCol) => skillPrefix.test(lines[cursorLine].slice(0, cursorCol)) || (current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? false),
+    shouldTriggerFileCompletion: (lines, cursorLine, cursorCol) =>
+      skillPrefix.test(lines[cursorLine].slice(0, cursorCol)) || (current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? false),
   };
 }
 
