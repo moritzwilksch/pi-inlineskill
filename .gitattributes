@@ -1,0 +1,5 @@
+# Generated files: collapsed in review and never merged line by line (merge=binary leaves the
+# conflict to the tool that writes the file).
+package-lock.json merge=binary linguist-generated=true
+# git-cliff writes it from the squash-merged titles.
+CHANGELOG.md linguist-generated=true

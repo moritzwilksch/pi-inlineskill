@@ -1,0 +1,17 @@
+output: [summary]
+templates:
+  run: run --as-is --quiet --no-progress
+pre-commit:
+  fail_on_changes: always
+  jobs:
+    - name: format
+      run: npm {run} format -- --no-error-on-unmatched-pattern {staged_files}
+    - name: lint
+      glob: "*.ts"
+      run: npm {run} lint -- {staged_files}
+    - name: typecheck
+      glob: "{*.ts,tsconfig.json,package.json,package-lock.json}"
+      run: npm {run} check
+    - name: zizmor
+      glob: ".github/**/*.{yml,yaml}"
+      run: uvx zizmor --no-progress --min-severity high --fix --offline .

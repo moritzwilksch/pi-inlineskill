@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 160,
+  "arrowParens": "avoid",
+  // The workflows are hand-maintained, with pinned action SHAs and comments; the formatter only
+  // wants to reflow their quotes, so it stays out of them. The lockfile and changelog are generated.
+  "ignorePatterns": ["**/*.yml", "**/*.yaml", "package-lock.json", "CHANGELOG.md"]
+}

@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/octo-sts/app/refs/heads/main/pkg/octosts/octosts.TrustPolicy.json
+issuer: https://token.actions.githubusercontent.com
+subject: repo:moritzwilksch@58488209/pi-inlineskill@1436897729:ref:refs/heads/main
+claim_pattern:
+  event_name: ^(push|workflow_dispatch)$
+  job_workflow_ref: ^moritzwilksch/pi-inlineskill/\.github/workflows/release\.yml@refs/heads/main$
+
+permissions:
+  contents: write
+  pull_requests: write
