@@ -29,7 +29,8 @@ From a local checkout, use `pi install .`, or try it for one session with `pi -e
 ## Development
 
 ```sh
-npm install --ignore-scripts
+npm install
+npm run hooks
 npm test
 npm run check
 ```

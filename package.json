@@ -26,7 +26,7 @@
     "lint": "oxlint --deny-warnings",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "prepare": "lefthook install"
+    "hooks": "lefthook install"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
