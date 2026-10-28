@@ -1,45 +1,30 @@
 # pi-inlineskill
 
-Trigger installed Pi skills anywhere in a prompt with `/name` or `/skill:name`. Typing `/` after whitespace or at the start of a line invokes Pi's completion action. Keep typing to filter, use arrow keys to choose, and Tab to insert. Enter selects and submits, as with native slash commands. Tab also completes partial references directly.
-
-A small `CustomEditor` subclass opens completion; Pi owns the menu, filtering updates, key handling, and insertion. Normal input delegates to Pi. Like native Tab completion, a single match inserts immediately. This extension replaces other custom editors; do not combine it with an extension that also replaces the editor.
+Use installed Pi skills anywhere in a prompt with `/name` or `/skill:name`:
 
 ```text
 Please use /a and then /skill:b.
 ```
 
-The extension replaces these references with `skill:a` and `skill:b`, then appends each skill's full body in Pi's native `<skill name="…" location="…">` format. YAML frontmatter is omitted, as in Pi. Skill directories remain in the blocks so supporting files resolve correctly.
+Type `/` at the start of a line or after whitespace to open completion. Use the arrow keys to choose, Tab to insert, or Enter to select and submit. Tab also completes partial references.
 
-Skill files are read by the extension before submission. The agent receives the instructions directly; it needs no `read()` call to load them. Blocks appear once per skill, in first-use order. Expansion does not recurse into skill content.
+Before submission, the extension replaces the references with `skill:a` and `skill:b` and appends each skill's instructions. Each skill appears once, in first-use order, without YAML frontmatter. Supporting files remain available relative to the skill directory.
 
 ## Install
-
-From npm:
 
 ```sh
 pi install npm:@moritzwilksch/pi-inlineskill
 ```
 
-From this directory:
-
-```sh
-pi install .
-```
-
-Or try it for one session:
-
-```sh
-pi -e ./index.ts
-```
+From a local checkout, use `pi install .`, or try it for one session with `pi -e ./index.ts`.
 
 ## Behavior
 
-- Both forms work at the beginning, middle, or end of a prompt.
-- Unknown names, paths, URLs, escaped slashes, inline code, and fenced code stay unchanged.
-- Leading prompt commands keep their native meaning if a skill shares their name. Pi dispatches extension and built-in commands normally.
-- Images are preserved. Interactive, RPC, and extension-injected input use the same expansion.
-- Unreadable skills cancel submission and report the file error. No partial or path-only expansion is sent.
-- Pi owns skill discovery and reload. No configuration or runtime dependencies are added.
+- Unknown names, paths, URLs, escaped slashes, and references in code stay unchanged. Skill content is not expanded recursively.
+- Leading prompt commands keep their native meaning when a skill shares their name.
+- Images are preserved. Expansion works with interactive, RPC, and extension-injected input.
+- Unreadable skills cancel submission and report the file error.
+- Pi handles skill discovery and reload. This extension replaces the editor, so don't combine it with another extension that replaces the editor.
 
 ## Development
 
