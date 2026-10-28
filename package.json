@@ -1,6 +1,6 @@
 {
   "name": "@moritzwilksch/pi-inlineskill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Expand skill references anywhere in a Pi prompt.",
   "keywords": [
     "pi-package"
