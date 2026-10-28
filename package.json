@@ -1,0 +1,33 @@
+{
+  "name": "pi-inlineskill",
+  "version": "0.1.0",
+  "description": "Expand skill references anywhere in a Pi prompt.",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test index.test.ts",
+    "check": "tsc --noEmit --module nodenext --target es2022 --strict --skipLibCheck --allowImportingTsExtensions index.ts index.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}
