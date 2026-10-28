@@ -29,12 +29,12 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.5",
     "git-cliff": "2.14.2",
     "lefthook": "2.2.2",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
-    "typescript": "^5.9.0"
+    "typescript": "^7.0.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
