@@ -8,7 +8,7 @@ Please use /a and then /skill:b.
 
 Type `/` at the start of a line or after whitespace to open completion. Use the arrow keys to choose, Tab to insert, or Enter to select and submit. Tab also completes partial references.
 
-Before submission, the extension replaces the references with `skill:a` and `skill:b` and appends each skill's instructions. Each skill appears once, in first-use order, without YAML frontmatter. Supporting files remain available relative to the skill directory.
+Before submission, the extension replaces the references with `skill:a` and `skill:b` and sends each skill's full instructions to the model as a message just before the prompt. The transcript shows each one collapsed as `[skill] name`, like native `/skill:` commands; expand it to read the instructions. Each skill appears once, in first-use order, without YAML frontmatter. Supporting files remain available relative to the skill directory.
 
 ## Install
 
