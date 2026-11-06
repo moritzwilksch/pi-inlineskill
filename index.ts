@@ -1,7 +1,18 @@
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AutocompleteProvider } from "@earendil-works/pi-tui";
-import { CustomEditor, stripFrontmatter, type ExtensionAPI, type SlashCommandInfo } from "@earendil-works/pi-coding-agent";
+import {
+  CustomEditor,
+  SkillInvocationMessageComponent,
+  stripFrontmatter,
+  type ExtensionAPI,
+  type ParsedSkillBlock,
+  type SlashCommandInfo,
+} from "@earendil-works/pi-coding-agent";
+
+const messageType = "inline-skill";
+
+type SkillBlock = Omit<ParsedSkillBlock, "userMessage">;
 
 // Consume code literals before looking for standalone skill references.
 const references =
@@ -76,6 +87,13 @@ class InlineSkillEditor extends CustomEditor {
 }
 
 export default function inlineSkills(pi: ExtensionAPI): void {
+  // Reuse Pi's collapsed `[skill] name` look; the model still receives the full block.
+  pi.registerMessageRenderer<SkillBlock>(messageType, (message, { expanded, outputPad }) => {
+    if (!message.details) return undefined;
+    const component = new SkillInvocationMessageComponent({ ...message.details, userMessage: undefined }, undefined, outputPad);
+    component.setExpanded(expanded);
+    return component;
+  });
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
     ctx.ui.addAutocompleteProvider(current => skillAutocomplete(current, pi));
@@ -85,7 +103,7 @@ export default function inlineSkills(pi: ExtensionAPI): void {
     const expanded = skillReferences(event.text, pi.getCommands());
     if (expanded.skills.size === 0) return { action: "continue" };
 
-    const blocks: string[] = [];
+    const blocks: SkillBlock[] = [];
     for (const [name, skill] of expanded.skills) {
       const path = skill.sourceInfo.path;
       let content: string;
@@ -96,9 +114,20 @@ export default function inlineSkills(pi: ExtensionAPI): void {
         ctx.ui.notify(`Cannot load skill:${name} from ${path}: ${error instanceof Error ? error.message : String(error)}`, "error");
         return { action: "handled" };
       }
-      const body = stripFrontmatter(content).trim();
-      blocks.push(`<skill name="${name}" location="${path}">\nReferences are relative to ${dirname(path)}.\n\n${body}\n</skill>`);
+      blocks.push({ name, location: path, content: `References are relative to ${dirname(path)}.\n\n${stripFrontmatter(content).trim()}` });
     }
-    return { action: "transform", text: `${expanded.text}\n\n${blocks.join("\n\n")}`, images: event.images };
+    // Messages sent here land before the prompt: appended now when idle, queued ahead of it while streaming.
+    for (const block of blocks) {
+      pi.sendMessage(
+        {
+          customType: messageType,
+          content: `<skill name="${block.name}" location="${block.location}">\n${block.content}\n</skill>`,
+          display: true,
+          details: block,
+        },
+        event.streamingBehavior ? { deliverAs: event.streamingBehavior } : undefined,
+      );
+    }
+    return { action: "transform", text: expanded.text, images: event.images };
   });
 }

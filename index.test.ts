@@ -11,8 +11,11 @@ import type {
   InputEvent,
   InputEventResult,
   KeybindingsManager,
+  MessageRenderer,
   SlashCommandInfo,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
+import { initTheme } from "@earendil-works/pi-coding-agent";
 import { CombinedAutocompleteProvider, Editor, getKeybindings, type TUI } from "@earendil-works/pi-tui";
 import inlineSkills from "./index.ts";
 
@@ -36,11 +39,17 @@ async function fixture(t: TestContext) {
   type Handler = (event: InputEvent, ctx: ExtensionContext) => Promise<InputEventResult>;
   const handlers = new Map<string, Handler>();
   const notices: string[] = [];
+  const sent: { content: unknown; options: unknown; message: Omit<Parameters<MessageRenderer>[0], "role" | "timestamp"> }[] = [];
+  let renderer: MessageRenderer | undefined;
   let wrap!: AutocompleteProviderFactory;
   let editorFactory!: NonNullable<Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]>;
   inlineSkills({
     on: (name: string, callback: Handler) => handlers.set(name, callback),
     getCommands: () => commands,
+    registerMessageRenderer: (_type: string, callback: MessageRenderer) => {
+      renderer = callback;
+    },
+    sendMessage: (message: (typeof sent)[number]["message"], options: unknown) => sent.push({ content: message.content, options, message }),
   } as unknown as ExtensionAPI);
   const ctx = {
     mode: "tui",
@@ -61,6 +70,16 @@ async function fixture(t: TestContext) {
     root,
     commands,
     notices,
+    get sent() {
+      return sent.map(({ content, options }) => ({ content, options }));
+    },
+    get messages() {
+      return sent.map(({ message }) => message);
+    },
+    get renderer() {
+      return renderer;
+    },
+    skills: () => sent.map(message => message.content),
     provider,
     native,
     editor: () => {
@@ -74,8 +93,8 @@ async function fixture(t: TestContext) {
     },
     suggest: (lines: string[], cursorLine = lines.length - 1, cursorCol = lines[cursorLine].length) =>
       provider.getSuggestions(lines, cursorLine, cursorCol, { signal: new AbortController().signal }),
-    submit: (text: string, source: InputEvent["source"] = "interactive", images?: InputEvent["images"]) =>
-      handlers.get("input")!({ type: "input", text, source, images }, ctx),
+    submit: (text: string, source: InputEvent["source"] = "interactive", images?: InputEvent["images"], streamingBehavior?: InputEvent["streamingBehavior"]) =>
+      handlers.get("input")!({ type: "input", text, source, images, streamingBehavior }, ctx),
     block: (name: string) =>
       `<skill name="${name}" location="${join(root, name, "SKILL.md")}">\nReferences are relative to ${join(root, name)}.\n\n# ${name}\n\nUse references/guide.md.\nKeep /b literal here.\n</skill>`,
   };
@@ -85,9 +104,10 @@ test("embeds complete native skill blocks once, in first-use order", async t => 
   const f = await fixture(t);
   assert.deepEqual(await f.submit("please use /b, /a and /skill:b; then /spell-check."), {
     action: "transform",
-    text: `please use skill:b, skill:a and skill:b; then skill:spell-check.\n\n${f.block("b")}\n\n${f.block("a")}\n\n${f.block("spell-check")}`,
+    text: `please use skill:b, skill:a and skill:b; then skill:spell-check.`,
     images: undefined,
   });
+  assert.deepEqual(f.skills(), [f.block("b"), f.block("a"), f.block("spell-check")]);
 });
 
 for (const syntax of ["/a", "/skill:a"]) {
@@ -95,9 +115,10 @@ for (const syntax of ["/a", "/skill:a"]) {
     const f = await fixture(t);
     assert.deepEqual(await f.submit(`${syntax} do the work`), {
       action: "transform",
-      text: `skill:a do the work\n\n${f.block("a")}`,
+      text: `skill:a do the work`,
       images: undefined,
     });
+    assert.deepEqual(f.skills(), [f.block("a")]);
   });
 }
 
@@ -119,9 +140,10 @@ test("expands references around code but never inside it", async t => {
   const f = await fixture(t);
   assert.deepEqual(await f.submit("Use (/a), not `/b`.\n```\n/b\n```\nThen /skill:a!"), {
     action: "transform",
-    text: `Use (skill:a), not \`/b\`.\n\`\`\`\n/b\n\`\`\`\nThen skill:a!\n\n${f.block("a")}`,
+    text: `Use (skill:a), not \`/b\`.\n\`\`\`\n/b\n\`\`\`\nThen skill:a!`,
     images: undefined,
   });
+  assert.deepEqual(f.skills(), [f.block("a")]);
 });
 
 for (const source of ["interactive", "rpc", "extension"] as const) {
@@ -130,11 +152,33 @@ for (const source of ["interactive", "rpc", "extension"] as const) {
     const images: NonNullable<InputEvent["images"]> = [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }];
     assert.deepEqual(await f.submit("Use /a", source, images), {
       action: "transform",
-      text: `Use skill:a\n\n${f.block("a")}`,
+      text: "Use skill:a",
       images,
     });
+    assert.deepEqual(f.skills(), [f.block("a")]);
   });
 }
+
+for (const streamingBehavior of [undefined, "steer", "followUp"] as const) {
+  test(`delivers skill messages ahead of the prompt when streaming is ${streamingBehavior}`, async t => {
+    const f = await fixture(t);
+    await f.submit("Use /a", "interactive", undefined, streamingBehavior);
+    assert.deepEqual(f.sent, [{ content: f.block("a"), options: streamingBehavior ? { deliverAs: streamingBehavior } : undefined }]);
+  });
+}
+
+test("renders skill messages with Pi's collapsed skill component", async t => {
+  initTheme("dark");
+  const f = await fixture(t);
+  await f.submit("Use /a");
+  const message = { role: "custom", ...f.messages[0]!, timestamp: 0 } as Parameters<MessageRenderer>[0];
+  const render = (expanded: boolean) =>
+    f.renderer!(message, { expanded, outputPad: 1 }, {} as Theme)!
+      .render(100)
+      .join("\n");
+  assert.match(render(false), /\[skill\].*a.*to expand/);
+  assert.match(render(true), /Use references\/guide\.md/);
+});
 
 test("preserves a leading prompt command that shares a skill name", async t => {
   const f = await fixture(t);
@@ -148,9 +192,12 @@ test("reads current skill content on every submission", async t => {
   await writeFile(join(f.root, "a", "SKILL.md"), "Updated instructions.");
   assert.deepEqual(await f.submit("/a"), {
     action: "transform",
-    text: `skill:a\n\n<skill name="a" location="${join(f.root, "a", "SKILL.md")}">\nReferences are relative to ${join(f.root, "a")}.\n\nUpdated instructions.\n</skill>`,
+    text: `skill:a`,
     images: undefined,
   });
+  assert.deepEqual(f.skills().slice(1), [
+    `<skill name="a" location="${join(f.root, "a", "SKILL.md")}">\nReferences are relative to ${join(f.root, "a")}.\n\nUpdated instructions.\n</skill>`,
+  ]);
 });
 
 test("cancels submission instead of sending a partial or path-only expansion", async t => {
@@ -159,6 +206,7 @@ test("cancels submission instead of sending a partial or path-only expansion", a
   assert.deepEqual(await f.submit("Use /a and /b"), { action: "handled" });
   assert.equal(f.notices.length, 1);
   assert.match(f.notices[0]!, /Cannot load skill:b.*ENOENT/);
+  assert.deepEqual(f.sent, []);
 });
 
 for (const prefix of ["/sp", "/skill:sp"]) {
@@ -175,9 +223,10 @@ for (const prefix of ["/sp", "/skill:sp"]) {
     assert.deepEqual(applied, { lines: ["Please use", `my ${suggestions!.items[0].value}`], cursorLine: 1, cursorCol: 3 + suggestions!.items[0].value.length });
     assert.deepEqual(await f.submit(applied.lines.join("\n")), {
       action: "transform",
-      text: `Please use\nmy skill:spell-check\n\n${f.block("spell-check")}`,
+      text: `Please use\nmy skill:spell-check`,
       images: undefined,
     });
+    assert.deepEqual(f.skills(), [f.block("spell-check")]);
   });
 }
 
