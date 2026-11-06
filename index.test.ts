@@ -326,6 +326,30 @@ test("typing a path slash does not open skill completion", async t => {
   assert.equal(editor.getText(), "Use .//");
 });
 
+for (const prefix of ["Use /spell", "Use /skill:spell"]) {
+  test(`completion recovers after correcting a typo in ${prefix}`, async t => {
+    const f = await fixture(t);
+    const editor = f.editor();
+    editor.setText("Use ");
+    editor.handleInput("/");
+    await t.waitFor(() => assert.equal(editor.isShowingAutocomplete(), true), { timeout: 1000, interval: 5 });
+    for (const character of prefix.slice(5)) editor.handleInput(character);
+
+    editor.handleInput("x");
+    await t.waitFor(() => assert.equal(editor.isShowingAutocomplete(), false), { timeout: 1000, interval: 5 });
+    editor.handleInput("\u007f");
+    await t.waitFor(() => assert.equal(editor.isShowingAutocomplete(), true), { timeout: 1000, interval: 5 });
+    assert.equal(editor.getText(), prefix);
+
+    editor.handleInput("-");
+    await t.waitFor(() => assert.match(editor.render(100).join("\n"), /spell-check/), { timeout: 1000, interval: 5 });
+    assert.equal(editor.getText(), `${prefix}-`);
+    editor.handleInput("\t");
+    assert.equal(editor.getText().trimEnd(), prefix.replace(/spell$/, "spell-check"));
+    assert.equal(editor.isShowingAutocomplete(), false);
+  });
+}
+
 test("reads the current skill registry when suggesting completions", async t => {
   const f = await fixture(t);
   f.commands.splice(0, 2);

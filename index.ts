@@ -76,12 +76,15 @@ function skillAutocomplete(current: AutocompleteProvider, pi: ExtensionAPI): Aut
 
 class InlineSkillEditor extends CustomEditor {
   handleInput(data: string): void {
+    const text = this.getText();
+    const wasShowingAutocomplete = this.isShowingAutocomplete();
     super.handleInput(data);
-    if (data !== "/" || this.isShowingAutocomplete()) return;
+    if (wasShowingAutocomplete || this.isShowingAutocomplete() || this.getText() === text) return;
     const { line, col } = this.getCursor();
-    if (/(?:^|\s)\/$/.test(this.getLines()[line].slice(0, col))) {
-      // Pi ignores '/' in provider triggers. Reuse its completion action instead.
-      super.handleInput("\t");
+    if (skillPrefix.test(this.getLines()[line].slice(0, col))) {
+      // Pi ignores '/' in provider triggers and exposes no public menu trigger.
+      // Use its internal trigger until one is public; Tab would insert a unique match.
+      super["tryTriggerAutocomplete"]();
     }
   }
 }
